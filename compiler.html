@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Compiler Visualizer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Outfit:wght@400;700&display=swap');
+
+  :root {
+    --bg:#0d0f1a; --panel:#181c30; --panel2:#1e2338; --border:#252a42;
+    --accent:#4f8aff; --accent2:#a78bfa; --green:#22d3a0; --red:#f87171;
+    --yellow:#fbbf24; --text:#e2e8f8; --muted:#6b7899;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Outfit',sans-serif; background:var(--bg); color:var(--text); padding:14px 18px; }
+  h1 { text-align:center; font-size:1.4rem; margin-bottom:12px; }
+  h1 span { color:var(--accent); }
+
+  /* terminal */
+  .terminal { background:var(--panel); border:1px solid var(--border); border-radius:10px; overflow:hidden; margin-bottom:10px; }
+  .tbar { display:flex; align-items:center; gap:6px; padding:7px 12px; background:var(--panel2); border-bottom:1px solid var(--border); font-size:0.72rem; color:var(--muted); font-weight:600; letter-spacing:.06em; text-transform:uppercase; }
+  .dot { width:9px; height:9px; border-radius:50%; }
+  .tbody { padding:10px 14px; display:flex; flex-direction:column; gap:7px; }
+  .prompt { font-family:'JetBrains Mono',monospace; font-size:0.8rem; color:var(--green); }
+  #lines { font-family:'JetBrains Mono',monospace; font-size:0.8rem; display:flex; flex-direction:column; gap:1px; }
+  .eline { display:flex; align-items:center; gap:8px; }
+  .eline .pc { color:var(--accent); min-width:12px; }
+  .eline button { background:none; border:none; color:var(--muted); cursor:pointer; opacity:.5; font-size:.8rem; }
+  .eline button:hover { opacity:1; color:var(--red); }
+  .irow { display:flex; align-items:center; gap:8px; background:#131626; border:1px solid var(--border); border-radius:7px; padding:5px 10px; }
+  .irow:focus-within { border-color:var(--accent); }
+  .irow .pc { color:var(--accent); font-family:'JetBrains Mono',monospace; }
+  .irow input { flex:1; background:none; border:none; outline:none; font-family:'JetBrains Mono',monospace; font-size:0.82rem; color:var(--text); caret-color:var(--accent); }
+  .irow input::placeholder { color:var(--muted); }
+  .abtn { background:var(--panel2); border:1px solid var(--border); color:var(--muted); padding:4px 10px; border-radius:6px; cursor:pointer; font-size:0.75rem; font-weight:600; }
+  .abtn:hover { border-color:var(--accent); color:var(--accent); }
+  .hint { font-size:0.7rem; color:var(--muted); font-family:'JetBrains Mono',monospace; }
+
+  /* run btn */
+  .run { display:block; width:100%; padding:9px; background:linear-gradient(135deg,var(--accent),#6a73ff); color:#fff; font-family:'Outfit',sans-serif; font-size:.92rem; font-weight:700; border:none; border-radius:8px; cursor:pointer; margin-bottom:12px; }
+  .run:hover { opacity:.9; }
+
+  /* panels */
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .panel { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:12px; }
+  .panel h3 { font-size:0.67rem; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); margin-bottom:8px; display:flex; align-items:center; gap:6px; }
+  .panel h3 i { width:7px; height:7px; border-radius:50%; background:var(--accent); display:inline-block; flex-shrink:0; }
+  .full { grid-column:1/-1; }
+
+  /* cfg */
+  .cfg-rule { font-family:'JetBrains Mono',monospace; font-size:.7rem; padding:2px 7px; margin-bottom:3px; border-radius:5px; border-left:3px solid var(--border); background:rgba(255,255,255,.02); display:flex; gap:0; opacity:.4; }
+  .cfg-rule.used { opacity:1; border-left-color:var(--accent); background:rgba(79,138,255,.07); }
+  .cfg-rule .lhs { color:var(--accent2); font-weight:600; }
+  .cfg-rule.used .lhs { color:var(--accent); }
+  .cfg-rule .arr { color:var(--muted); margin:0 5px; }
+  .cfg-rule .rhs { color:var(--muted); }
+  .cfg-rule.used .rhs { color:var(--text); }
+  .badge { margin-left:auto; font-size:.58rem; background:var(--accent); color:#fff; border-radius:3px; padding:1px 5px; flex-shrink:0; }
+
+  /* symbol chip */
+  .chip { display:inline-block; background:rgba(34,211,160,.1); border:1px solid rgba(34,211,160,.25); border-radius:5px; padding:2px 8px; font-family:'JetBrains Mono',monospace; font-size:.76rem; color:var(--green); margin:2px; }
+
+  /* errors */
+  .err { font-family:'JetBrains Mono',monospace; font-size:.74rem; color:var(--red); background:rgba(248,113,113,.08); border-left:3px solid var(--red); padding:3px 8px; border-radius:0 4px 4px 0; margin-bottom:3px; }
+  .ok  { font-family:'JetBrains Mono',monospace; font-size:.78rem; color:var(--green); }
+
+  /* lexeme table */
+  table { width:100%; border-collapse:collapse; font-family:'JetBrains Mono',monospace; font-size:.75rem; }
+  th { text-align:left; padding:4px 10px; background:var(--panel2); color:var(--muted); font-size:.65rem; text-transform:uppercase; letter-spacing:.08em; border-bottom:1px solid var(--border); }
+  td { padding:2px 10px; border-bottom:1px solid var(--border); }
+  tr:last-child td { border:none; }
+  tr:hover td { background:rgba(255,255,255,.02); }
+  .scroll { max-height:180px; overflow-y:auto; }
+  .kw { color:var(--accent2); } .id { color:#60a5fa; } .nm { color:var(--green); }
+  .op { color:var(--yellow); } .sp { color:var(--accent2); } .st { color:#f97316; }
+  .un { color:var(--red); } .mu { color:var(--muted); }
+
+  /* tree */
+  .tree { font-family:'JetBrains Mono',monospace; font-size:.74rem; max-height:260px; overflow-y:auto; }
+  .tree ul { list-style:none; padding-left:16px; border-left:1px dashed var(--border); margin-left:4px; }
+  .tree > ul { border:none; padding:0; margin:0; }
+  .tree li { padding:1px 0; }
+  .nl { cursor:pointer; padding:1px 5px; border-radius:3px; display:inline-block; }
+  .nl:hover { background:rgba(255, 255, 255, 0.1); }
+  .nl.keyword { color:var(--accent2); font-weight:600; } .nl.identifier { color:#60a5fa; }
+  .nl.number { color:var(--green); } .nl.operator { color:var(--yellow); }
+  .nl.string { color:#f97316; } .nl.error { color:var(--red); text-decoration:underline wavy; }
+  .nl.normal { color:var(--text); }
+
+  /* assembly */
+  .aline { font-family:'JetBrains Mono',monospace; font-size:.74rem; line-height:1.5; }
+  .aline.lbl { color:var(--yellow); font-weight:700; padding-top:5px; }
+  .aline .aop { color:var(--accent); min-width:110px; display:inline-block; }
+
+  ::-webkit-scrollbar { width:4px; } ::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+</style>
+</head>
+<body>
+
+<h1>⚙️ <span>Compiler</span> Visualizer</h1>
+
+<div class="terminal">
+  <div class="tbar">
+    <div class="dot" style="background:#f87171"></div>
+    <div class="dot" style="background:#fbbf24"></div>
+    <div class="dot" style="background:#22d3a0"></div>
+    Program Input — Enter program (END to finish)
+  </div>
+  <div class="tbody">
+    <div class="prompt">Enter program (END to finish):</div>
+    <div id="lines"></div>
+    <div class="irow">
+      <span class="pc">&gt;</span>
+      <input id="li" placeholder="type a line and press Enter, or END to finish..." autocomplete="off" spellcheck="false">
+      <button class="abtn" onclick="addLine()">Add</button>
+    </div>
+    <span class="hint">Enter or click Add · Type END to stop · × to remove a line</span>
+  </div>
+</div>
+
+<button class="run" onclick="runCompiler()">▶ Run Compiler</button>
+
+<div class="grid">
+  <div class="panel"><h3><i></i> CFG Rules</h3><div id="cfg"></div></div>
+  <div class="panel"><h3><i style="background:var(--green)"></i> Symbol Table</h3><div id="sym"></div></div>
+  <div class="panel full"><h3><i style="background:var(--yellow)"></i> Lexeme Table</h3><div class="scroll"><table><thead><tr><th>#</th><th>Lexeme</th><th>Token</th></tr></thead><tbody id="lex"></tbody></table></div></div>
+  <div class="panel full"><h3><i style="background:var(--red)"></i> Errors</h3><div id="err"></div></div>
+  <div class="panel full"><h3><i style="background:var(--accent2)"></i> Syntax Tree <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:.65rem">(click to expand/collapse)</span></h3><div class="tree" id="tree"></div></div>
+  <div class="panel full"><h3><i style="background:#fb923c"></i> Assembly Code</h3><div id="asm"></div></div>
+</div>
+
+<script>
+const CFG_RULES = [
+  {k:"Program",    l:"program",    r:"statement_list"},
+  {k:"Statement",  l:"statement",  r:"declaration | assignment | increment | while_stmt | printf_stmt | block"},
+  {k:"Declaration",l:"declaration",r:"type IDENTIFIER ;"},
+  {k:"Assignment", l:"assignment", r:"IDENTIFIER = expression ;"},
+  {k:"Increment",  l:"increment",  r:"IDENTIFIER ++ ;"},
+  {k:"WhileStmt",  l:"while_stmt", r:"while ( condition ) statement"},
+  {k:"PrintfStmt", l:"printf_stmt",r:"printf ( STRING , IDENTIFIER ) ;"},
+  {k:"Block",      l:"block",      r:"{ statement_list }"},
+  {k:"Condition",  l:"condition",  r:"expression relop expression"},
+  {k:"Expression", l:"expression", r:"term (+|- term)*"},
+  {k:"Term",       l:"term",       r:"factor (*|/ factor)*"},
+  {k:"Factor",     l:"factor",     r:"IDENTIFIER | NUMBER"},
+  {k:"RelOp_lt",l:"relop",r:"<"},{k:"RelOp_gt",l:"relop",r:">"},
+  {k:"RelOp_eq",l:"relop",r:"=="},{k:"RelOp_ne",l:"relop",r:"!="},
+];
+
+let codeLines=[], tokens=[], idx=0, errors=[], used=new Set();
+
+// ── Line input ──────────────────────────────────────────────────────────────
+function addLine(){
+  const inp=document.getElementById("li"), v=inp.value.trim(); if(!v) return;
+  if(v==="END"){ inp.value=""; return; }
+  codeLines.push(v); inp.value=""; renderLines(); inp.focus();
+}
+document.addEventListener("DOMContentLoaded",()=>{
+  document.getElementById("li").addEventListener("keydown",e=>{ if(e.key==="Enter") addLine(); });
+  codeLines=["while (i < 5) {","printf(\"%d\\n\", i);","i++;","}"];
+  renderLines(); runCompiler();
+});
+function removeLine(i){ codeLines.splice(i,1); renderLines(); }
+function renderLines(){
+  const el=document.getElementById("lines"); el.innerHTML="";
+  codeLines.forEach((l,i)=>{
+    const d=document.createElement("div"); d.className="eline";
+    d.innerHTML=`<span class="pc">&gt;</span><span>${esc(l)}</span><button onclick="removeLine(${i})">×</button>`;
+    el.appendChild(d);
+  });
+}
+function esc(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+// ── Lexer ───────────────────────────────────────────────────────────────────
+const KW=["int","float","while","printf"], OPS=["==","!=","++","<=",">=","+","-","*","/","=","<",">"], SEP=["(",")","{","}",";",","];
+function tokenize(code){
+  const t=[]; let i=0;
+  while(i<code.length){
+    const ch=code[i];
+    if(/\s/.test(ch)){i++;continue;}
+    if(ch==='"'){ let s='"'; i++; while(i<code.length&&code[i]!=='"') s+=code[i++]; t.push({v:s+'"',tp:"STRING"}); i++;continue; }
+    if(/[a-zA-Z_]/.test(ch)){ let w=""; while(i<code.length&&/\w/.test(code[i])) w+=code[i++]; t.push({v:w,tp:KW.includes(w)?"KEYWORD":"IDENTIFIER"});continue; }
+    if(/\d/.test(ch)){ let n=""; while(i<code.length&&/\d/.test(code[i])) n+=code[i++]; t.push({v:n,tp:"NUMBER"});continue; }
+    const two=code.slice(i,i+2);
+    if(OPS.includes(two)){t.push({v:two,tp:"OPERATOR"});i+=2;continue;}
+    if(OPS.includes(ch)){t.push({v:ch,tp:"OPERATOR"});i++;continue;}
+    if(SEP.includes(ch)){t.push({v:ch,tp:"SEPARATOR"});i++;continue;}
+    t.push({v:ch,tp:"UNKNOWN"}); i++;
+  }
+  t.push({v:"EOF",tp:"EOF"}); return t;
+}
+
+// ── Parser ──────────────────────────────────────────────────────────────────
+function cur(){ return tokens[idx]||{v:"EOF",tp:"EOF"}; }
+function use(k){ used.add(k); }
+function mk(name,type="normal"){ return {name,type,children:[]}; }
+function perr(msg){ const f=cur().v==="EOF"?"end of input":`'${cur().v}'`; errors.push(`Near ${f} → ${msg}`); while(cur().v!==";"&&cur().v!=="}"&&cur().tp!=="EOF") idx++; if(cur().v===";") idx++; return mk("ERROR","error"); }
+function match(v){ if(cur().v===v){const n=mk(v,cls(cur()));idx++;return n;} return perr(`Expected '${v}'`); }
+function matchT(tp){ if(cur().tp===tp){const n=mk(cur().v,cls(cur()));idx++;return n;} return perr(`Expected ${tp}`); }
+function cls(t){ return t.tp==="KEYWORD"?"keyword":t.tp==="IDENTIFIER"?"identifier":t.tp==="NUMBER"?"number":t.tp==="STRING"?"string":t.tp==="OPERATOR"?"operator":"normal"; }
+
+function pProgram(){ use("Program"); const n=mk("Program"); while(cur().tp!=="EOF") n.children.push(pStatement()); return n; }
+function pStatement(){
+  use("Statement"); const n=mk("Statement"); const v=cur().v;
+  if(v==="int"||v==="float") n.children.push(pDecl());
+  else if(v==="while") n.children.push(pWhile());
+  else if(v==="printf") n.children.push(pPrintf());
+  else if(v==="{") n.children.push(pBlock());
+  else if(cur().tp==="IDENTIFIER"){ if(tokens[idx+1]&&tokens[idx+1].v==="++") n.children.push(pInc()); else n.children.push(pAssign()); }
+  else n.children.push(perr(`Unexpected '${v}'`));
+  return n;
+}
+function pDecl(){ use("Declaration"); const n=mk("Declaration"); n.children.push(match(cur().v)); n.children.push(matchT("IDENTIFIER")); n.children.push(match(";")); return n; }
+function pAssign(){ use("Assignment"); const n=mk("Assignment"); n.children.push(matchT("IDENTIFIER")); n.children.push(match("=")); n.children.push(pExpr()); n.children.push(match(";")); return n; }
+function pInc(){ use("Increment"); const n=mk("Increment"); n.children.push(matchT("IDENTIFIER")); n.children.push(match("++")); n.children.push(match(";")); return n; }
+function pPrintf(){ use("PrintfStmt"); const n=mk("Printf"); n.children.push(match("printf")); n.children.push(match("(")); if(cur().tp==="STRING"){n.children.push(matchT("STRING")); n.children.push(match(","));} n.children.push(matchT("IDENTIFIER")); n.children.push(match(")")); n.children.push(match(";")); return n; }
+function pWhile(){ use("WhileStmt"); const n=mk("WhileStmt","keyword"); n.children.push(match("while")); n.children.push(match("(")); n.children.push(pCond()); n.children.push(match(")")); n.children.push(cur().v==="{"?pBlock():pStatement()); return n; }
+function pBlock(){ use("Block"); const n=mk("Block"); n.children.push(match("{")); while(cur().v!=="}"&&cur().tp!=="EOF") n.children.push(pStatement()); n.children.push(match("}")); return n; }
+function pCond(){ use("Condition"); const n=mk("Condition"); n.children.push(pExpr()); const op=cur().v; if(["<",">","==","!="].includes(op)){use("RelOp_"+(op==="<"?"lt":op===">"?"gt":op==="=="?"eq":"ne")); n.children.push(match(op));} else n.children.push(perr("Expected relational operator")); n.children.push(pExpr()); return n; }
+function pExpr(){ use("Expression"); const n=mk("Expression"); n.children.push(pTerm()); while(cur().v==="+"||cur().v==="-"){n.children.push(match(cur().v)); n.children.push(pTerm());} return n; }
+function pTerm(){ use("Term"); const n=mk("Term"); n.children.push(pFactor()); while(cur().v==="*"||cur().v==="/"){n.children.push(match(cur().v)); n.children.push(pFactor());} return n; }
+function pFactor(){ use("Factor"); const n=mk("Factor"); if(cur().tp==="IDENTIFIER") n.children.push(matchT("IDENTIFIER")); else if(cur().tp==="NUMBER") n.children.push(matchT("NUMBER")); else n.children.push(perr("Expected IDENTIFIER or NUMBER")); return n; }
+
+// ── Semantic ─────────────────────────────────────────────────────────────────
+function semantic(){
+  const table={}, semErr=[];
+  for(let i=0;i<tokens.length;i++) if(tokens[i].v==="int"||tokens[i].v==="float"){ const nm=tokens[i+1]; if(nm&&nm.tp==="IDENTIFIER"){ if(table[nm.v]) semErr.push(`'${nm.v}' already declared`); else table[nm.v]=tokens[i].v; } }
+  for(const t of tokens) if(t.tp==="IDENTIFIER"&&t.v!=="printf"&&!table[t.v]) semErr.push(`'${t.v}' not declared`);
+  return {table,semErr};
+}
+
+// ── Assembly ──────────────────────────────────────────────────────────────────
+function genAsm(){
+  const a=[]; let lbl=1; const t=tokens.filter(x=>x.tp!=="EOF");
+  for(let i=0;i<t.length;i++){
+    if(t[i].v!=="while") continue;
+    const s="L"+lbl++, e="L"+lbl++, left=t[i+2]?.v, op=t[i+3]?.v, right=t[i+4]?.v;
+    a.push({lbl:s+":"},{op:"LOAD",arg:left},{op:"CMP",arg:right});
+    if(op==="<") a.push({op:"JGE",arg:e}); else if(op===">") a.push({op:"JLE",arg:e});
+    let b=i+6; while(b<t.length&&t[b].v!=="{") b++; b++;
+    while(b<t.length&&t[b].v!=="}"){
+      if(t[b].v==="printf"){ const f=t[b+2]?.v||"",v=t[b+4]?.v||""; if(f.includes("%d")) a.push({op:"PRINT_INT",arg:v}); if(f.includes("\\n")) a.push({op:"PRINT_NEWLINE",arg:""}); b++; }
+      else if(t[b+1]?.v==="++"){a.push({op:"INC",arg:t[b].v}); b++;}
+      else if(t[b+1]?.v==="="){const vr=t[b].v,l=t[b+2]?.v,o2=t[b+3]?.v,r=t[b+4]?.v; a.push({op:"LOAD",arg:l}); if(o2==="+") a.push({op:"ADD",arg:r}); else if(o2==="-") a.push({op:"SUB",arg:r}); else if(o2==="*") a.push({op:"MUL",arg:r}); else if(o2==="/") a.push({op:"DIV",arg:r}); a.push({op:"STORE",arg:vr}); b++;}
+      else b++;
+    }
+    a.push({op:"JMP",arg:s},{lbl:e+":"});
+  }
+  return a;
+}
+
+// ── Render ───────────────────────────────────────────────────────────────────
+function renderCFG(){ const d=document.getElementById("cfg"); d.innerHTML=""; CFG_RULES.forEach(r=>{ const el=document.createElement("div"); el.className="cfg-rule"+(used.has(r.k)?" used":""); el.innerHTML=`<span class="lhs">${r.l}</span><span class="arr">→</span><span class="rhs">${r.r}</span>`+(used.has(r.k)?`<span class="badge">used</span>`:""); d.appendChild(el); }); }
+
+function renderLex(){ const b=document.getElementById("lex"); b.innerHTML=""; const cls={KEYWORD:"kw",IDENTIFIER:"id",NUMBER:"nm",OPERATOR:"op",SEPARATOR:"sp",STRING:"st",UNKNOWN:"un"}; tokens.filter(t=>t.tp!=="EOF").forEach((t,i)=>{ const tr=document.createElement("tr"); tr.innerHTML=`<td class="mu">${i+1}</td><td>${esc(t.v)}</td><td class="${cls[t.tp]||""}">${t.tp}</td>`; b.appendChild(tr); }); }
+
+function renderNode(node){ const li=document.createElement("li"); const sp=document.createElement("span"); sp.textContent=node.name; sp.className="nl "+node.type; li.appendChild(sp); if(node.children.length){const ul=document.createElement("ul"); node.children.forEach(c=>ul.appendChild(renderNode(c))); ul.style.display="block"; sp.addEventListener("click",e=>{e.stopPropagation();ul.style.display=ul.style.display==="none"?"block":"none";}); li.appendChild(ul);} return li; }
+
+function renderAsm(a){ const d=document.getElementById("asm"); if(!a.length){d.innerHTML=`<span class="mu" style="font-family:'JetBrains Mono',monospace;font-size:.74rem">No while loop found</span>`;return;} d.innerHTML=""; a.forEach(l=>{ const el=document.createElement("div"); if(l.lbl){el.className="aline lbl";el.textContent=l.lbl;}else{el.className="aline";el.innerHTML=`<span class="aop">${l.op}</span><span>${esc(l.arg||"")}</span>`;} d.appendChild(el); }); }
+
+function runCompiler(){
+  const code=codeLines.join("\n");
+  tokens=[]; idx=0; errors=[]; used=new Set();
+  tokens=tokenize(code);
+  renderLex();
+  const tree=pProgram();
+  renderCFG();
+  const {table,semErr}=semantic();
+  const allErr=[...errors,...semErr];
+  document.getElementById("err").innerHTML=allErr.length?allErr.map(e=>`<div class="err">✗ ${e}</div>`).join(""):`<div class="ok">✓ Compilation Finished Successfully</div>`;
+  const syms=Object.keys(table); document.getElementById("sym").innerHTML=syms.length?syms.map(s=>`<span class="chip">${esc(s)} : ${table[s]}</span>`).join(""):`<span class="mu">No declarations</span>`;
+  const treeEl=document.getElementById("tree"); treeEl.innerHTML=""; const ul=document.createElement("ul"); ul.appendChild(renderNode(tree)); treeEl.appendChild(ul);
+  renderAsm(genAsm());
+}
+</script>
+</body>
+</html>
